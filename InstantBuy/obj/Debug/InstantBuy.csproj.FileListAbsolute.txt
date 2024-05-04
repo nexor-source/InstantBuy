@@ -1,0 +1,6 @@
+D:\coding\vs\InstantBuy\InstantBuy\bin\Debug\InstantBuy.dll
+D:\coding\vs\InstantBuy\InstantBuy\bin\Debug\InstantBuy.pdb
+D:\coding\vs\InstantBuy\InstantBuy\obj\Debug\InstantBuy.csproj.AssemblyReference.cache
+D:\coding\vs\InstantBuy\InstantBuy\obj\Debug\InstantBuy.csproj.CoreCompileInputs.cache
+D:\coding\vs\InstantBuy\InstantBuy\obj\Debug\InstantBuy.dll
+D:\coding\vs\InstantBuy\InstantBuy\obj\Debug\InstantBuy.pdb

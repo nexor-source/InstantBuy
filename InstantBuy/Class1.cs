@@ -27,11 +27,12 @@ namespace InstantBuy
     {
         private const string modGUID = "nexor.InstantBuy";
         private const string modName = "InstantBuy";
-        private const string modVersion = "0.0.1";
+        private const string modVersion = "0.0.3";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
         public ConfigEntry<float> offset;
+        public ConfigEntry<string> ignored_item;
 
         public static InstantBuy Instance;
         public static BepInEx.Logging.ManualLogSource Logger;
@@ -50,9 +51,15 @@ namespace InstantBuy
                                         0.2f,
                                         "Controls the offset of where purchased items are generated 控制购买物品生成位置的偏移");
 
+            ignored_item = Config.Bind<string>("InstantBuy Config",
+                                        "ignored_item 不会触发该mod的物品名单",
+                                        "-1,",
+                                        "Numbers are separated by commas, e.g. -1,0,1,2    -1 is used as a placeholder, please go to the mod introduction page in the ThunderStore to check which number corresponds to which item. " +
+                                        "数字使用逗号隔开，如-1,0,1,2    -1是用来占位的，具体哪个数字对应哪个物品请到雷电商城的mod介绍页查看");
+
             Logger = base.Logger;
             harmony.PatchAll();
-            Logger.LogInfo("InstantBuy 0.0.1 loaded.");
+            Logger.LogInfo("InstantBuy " + modVersion + " loaded.");
 
             
         }
@@ -63,16 +70,12 @@ namespace InstantBuy
         [HarmonyPatch(typeof(Terminal))]
         internal class Terminal_Patch
         {
-            [HarmonyPatch("SyncGroupCreditsClientRpc")]
-            [HarmonyPrefix]
-            public static void prefix(Terminal __instance, int newGroupCredits, ref int numItemsInShip)
-            {
-                numItemsInShip = 0;
-            }
+            private static List<int> instantItems;
+
 
             [HarmonyPatch("SyncGroupCreditsClientRpc")]
-            [HarmonyPostfix]
-            public static void postfix(Terminal __instance, int newGroupCredits, int numItemsInShip)
+            [HarmonyPrefix]
+            public static void Prefix(Terminal __instance, int newGroupCredits, ref int numItemsInShip)
             {
                 NetworkManager networkManager = StartOfRound.Instance.localPlayerController.NetworkManager;
                 if (!networkManager.IsServer)
@@ -81,25 +84,66 @@ namespace InstantBuy
                     return;
                 }
 
-                // InstantBuy.Logger.LogInfo("触发同步金钱函数，新购入物品数量为" + numItemsInShip);
                 List<int> boughtItems = __instance.orderedItemsFromTerminal;
-                for (int i = 0; i < boughtItems.Count; i++)
+                // 使用逗号分隔
+                List<int>  ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Split(',').Select(int.Parse).ToList();
+                // 将boughtItems分为两个列表，一个是在ignoredItems中出现的，一类则不是
+                instantItems = new List<int>();
+                instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
+                
+                
+                numItemsInShip = __instance.orderedItemsFromTerminal.Count - instantItems.Count;
+
+                // Logger.LogInfo("钱 瞬间购买列表物品数:" + instantItems.Count);
+            }
+
+            [HarmonyPatch("SyncGroupCreditsClientRpc")]
+            [HarmonyPostfix]
+            public static void Postfix(Terminal __instance, int newGroupCredits, int numItemsInShip)
+            {
+                NetworkManager networkManager = StartOfRound.Instance.localPlayerController.NetworkManager;
+                if (!networkManager.IsServer)
                 {
-                    GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(__instance.buyableItemsList[boughtItems[i]].spawnPrefab,
-                        new Vector3(2f + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value), 0.3f, -14f + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value)), Quaternion.identity, StartOfRound.Instance.propsContainer);
+                    // InstantBuy.Logger.LogInfo("你不是server，已退出");
+                    return;
+                }
+
+                List<int> boughtItems = __instance.orderedItemsFromTerminal;
+                instantItems = new List<int>();
+                List<int> ignoredItem_list;
+
+                if (string.IsNullOrEmpty(InstantBuy.Instance.ignored_item.Value)) 
+                {
+                    ignoredItem_list = new List<int>();
+                }
+                else
+                {
+                    ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Split(',').Select(int.Parse).ToList();
+                }
+                instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
+
+                // InstantBuy.Logger.LogInfo("触发同步金钱函数，新购入物品数量为" + numItemsInShip);
+                // Logger.LogInfo("瞬间购买列表物品数:" + instantItems.Count);
+
+                Vector3 spawn_pos = StartOfRound.Instance.insideShipPositions[10].position;
+                spawn_pos.z += 1.5f;
+
+                foreach (int itemIndex in instantItems)
+                {
+                    GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(__instance.buyableItemsList[itemIndex].spawnPrefab,
+                        new Vector3(spawn_pos.x + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value), spawn_pos.y, 
+                        spawn_pos.z + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value)), Quaternion.identity, StartOfRound.Instance.propsContainer);
                     gameObject.GetComponent<GrabbableObject>().fallTime = 0f;
+                    gameObject.GetComponent<GrabbableObject>().isInShipRoom = true;
+                    gameObject.GetComponent<GrabbableObject>().transform.parent = GameObject.Find("/Environment/HangarShip").transform;
                     gameObject.GetComponent<NetworkObject>().Spawn(false);
                     // InstantBuy.Logger.LogInfo("已完成实例化: " + gameObject.GetComponent<GrabbableObject>().itemProperties.itemName);
                 }
 
-
-                /*ItemDropship x = UnityEngine.Object.FindObjectOfType<ItemDropship>();
-                x.ShipLeaveClientRpc();*/
-
-
-                __instance.ClearBoughtItems();
+                __instance.orderedItemsFromTerminal = boughtItems.Where(item => ignoredItem_list.Contains(item)).ToList();
                 // InstantBuy.Logger.LogInfo("正常退出");
             }
         }
+
     }
 }

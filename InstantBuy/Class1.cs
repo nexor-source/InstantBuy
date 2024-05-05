@@ -27,7 +27,7 @@ namespace InstantBuy
     {
         private const string modGUID = "nexor.InstantBuy";
         private const string modName = "InstantBuy";
-        private const string modVersion = "0.0.3";
+        private const string modVersion = "0.0.4";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -86,7 +86,7 @@ namespace InstantBuy
 
                 List<int> boughtItems = __instance.orderedItemsFromTerminal;
                 // 使用逗号分隔
-                List<int>  ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Split(',').Select(int.Parse).ToList();
+                List<int>  ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
                 // 将boughtItems分为两个列表，一个是在ignoredItems中出现的，一类则不是
                 instantItems = new List<int>();
                 instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
@@ -118,7 +118,7 @@ namespace InstantBuy
                 }
                 else
                 {
-                    ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Split(',').Select(int.Parse).ToList();
+                    ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
                 }
                 instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
 

@@ -27,7 +27,7 @@ namespace InstantBuy
     {
         private const string modGUID = "nexor.InstantBuy";
         private const string modName = "InstantBuy";
-        private const string modVersion = "0.0.4";
+        private const string modVersion = "0.0.5";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -77,21 +77,16 @@ namespace InstantBuy
             [HarmonyPrefix]
             public static void Prefix(Terminal __instance, int newGroupCredits, ref int numItemsInShip)
             {
+                if (StartOfRound.Instance.localPlayerController==null) return;
                 NetworkManager networkManager = StartOfRound.Instance.localPlayerController.NetworkManager;
-                if (!networkManager.IsServer)
-                {
-                    // InstantBuy.Logger.LogInfo("你不是server，已退出");
-                    return;
-                }
+                if (!networkManager.IsServer) return;
+
 
                 List<int> boughtItems = __instance.orderedItemsFromTerminal;
-                // 使用逗号分隔
-                List<int>  ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
-                // 将boughtItems分为两个列表，一个是在ignoredItems中出现的，一类则不是
-                instantItems = new List<int>();
+                List<int> ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
                 instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
-                
-                
+
+                // 同步在途物品数量
                 numItemsInShip = __instance.orderedItemsFromTerminal.Count - instantItems.Count;
 
                 // Logger.LogInfo("钱 瞬间购买列表物品数:" + instantItems.Count);
@@ -101,29 +96,17 @@ namespace InstantBuy
             [HarmonyPostfix]
             public static void Postfix(Terminal __instance, int newGroupCredits, int numItemsInShip)
             {
+                if (StartOfRound.Instance.localPlayerController == null) return;
                 NetworkManager networkManager = StartOfRound.Instance.localPlayerController.NetworkManager;
-                if (!networkManager.IsServer)
-                {
-                    // InstantBuy.Logger.LogInfo("你不是server，已退出");
-                    return;
-                }
+                if (!networkManager.IsServer) return;
+
 
                 List<int> boughtItems = __instance.orderedItemsFromTerminal;
-                instantItems = new List<int>();
-                List<int> ignoredItem_list;
-
-                if (string.IsNullOrEmpty(InstantBuy.Instance.ignored_item.Value)) 
-                {
-                    ignoredItem_list = new List<int>();
-                }
-                else
-                {
-                    ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
-                }
+                List<int> ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
                 instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
 
-                // InstantBuy.Logger.LogInfo("触发同步金钱函数，新购入物品数量为" + numItemsInShip);
-                // Logger.LogInfo("瞬间购买列表物品数:" + instantItems.Count);
+
+                // 生成物品
 
                 Vector3 spawn_pos = StartOfRound.Instance.insideShipPositions[10].position;
                 spawn_pos.z += 1.5f;
@@ -131,7 +114,7 @@ namespace InstantBuy
                 foreach (int itemIndex in instantItems)
                 {
                     GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(__instance.buyableItemsList[itemIndex].spawnPrefab,
-                        new Vector3(spawn_pos.x + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value), spawn_pos.y, 
+                        new Vector3(spawn_pos.x + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value), spawn_pos.y,
                         spawn_pos.z + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value)), Quaternion.identity, StartOfRound.Instance.propsContainer);
                     gameObject.GetComponent<GrabbableObject>().fallTime = 0f;
                     gameObject.GetComponent<GrabbableObject>().isInShipRoom = true;
@@ -145,5 +128,53 @@ namespace InstantBuy
             }
         }
 
+
+        /*[HarmonyPatch(typeof(Terminal))]
+        internal class Terminal_Patch
+        {
+            private static List<int> instantItems;
+
+
+            [HarmonyPatch("BuyItemsServerRpc")]
+            [HarmonyPrefix]
+            public static void Prefix(Terminal __instance, ref int[] boughtItems, int newGroupCredits, ref int numItemsInShip)
+            {
+                Logger.LogInfo("进入了");
+
+                // 如果非服务器，则不要管
+                if (__instance != StartOfRound.Instance.localPlayerController) return;
+                var protectedInternalField = typeof(PlayerControllerB).GetField("__rpc_exec_stage", BindingFlags.Instance | BindingFlags.NonPublic);
+                int value = (int)protectedInternalField.GetValue(__instance);
+                if (value != 1) return;
+
+                Logger.LogInfo("我是server");
+
+                // 过滤出需要瞬间生成的物品类
+                List<int> ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
+                instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
+
+                // 修改同步给客机的在途物品数量
+                numItemsInShip = __instance.orderedItemsFromTerminal.Count + boughtItems.Length - instantItems.Count;
+
+                // 生成需要瞬间生成的物品
+                Vector3 spawn_pos = StartOfRound.Instance.insideShipPositions[10].position;
+                spawn_pos.z += 1.5f;
+                foreach (int itemIndex in instantItems)
+                {
+                    GameObject gameObject = UnityEngine.Object.Instantiate<GameObject>(__instance.buyableItemsList[itemIndex].spawnPrefab,
+                        new Vector3(spawn_pos.x + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value), spawn_pos.y,
+                        spawn_pos.z + UnityEngine.Random.Range(-InstantBuy.Instance.offset.Value, InstantBuy.Instance.offset.Value)), Quaternion.identity, StartOfRound.Instance.propsContainer);
+                    gameObject.GetComponent<GrabbableObject>().fallTime = 0f;
+                    gameObject.GetComponent<GrabbableObject>().isInShipRoom = true;
+                    gameObject.GetComponent<GrabbableObject>().transform.parent = GameObject.Find("/Environment/HangarShip").transform;
+                    gameObject.GetComponent<NetworkObject>().Spawn(false);
+                }
+
+                // 更新一下买的东西的列表，改成剩下没有瞬间生成的物品列表
+                boughtItems = (int[]) boughtItems.Where(item => ignoredItem_list.Contains(item));
+            }
+
+            
+        }*/
     }
 }

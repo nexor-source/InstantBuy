@@ -27,12 +27,13 @@ namespace InstantBuy
     {
         private const string modGUID = "nexor.InstantBuy";
         private const string modName = "InstantBuy";
-        private const string modVersion = "0.0.5";
+        private const string modVersion = "0.0.8";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
         public ConfigEntry<float> offset;
         public ConfigEntry<string> ignored_item;
+        public ConfigEntry<bool> companyOnly;
 
         public static InstantBuy Instance;
         public static BepInEx.Logging.ManualLogSource Logger;
@@ -45,25 +46,13 @@ namespace InstantBuy
             {
                 Instance = this;
             }
-
-            offset = Config.Bind<float>("InstantBuy Config",
-                                        "offset 偏移",
-                                        0.2f,
-                                        "Controls the offset of where purchased items are generated 控制购买物品生成位置的偏移");
-
-            ignored_item = Config.Bind<string>("InstantBuy Config",
-                                        "ignored_item 不会触发该mod的物品名单",
-                                        "-1,",
-                                        "Numbers are separated by commas, e.g. -1,0,1,2    -1 is used as a placeholder, please go to the mod introduction page in the ThunderStore to check which number corresponds to which item. " +
-                                        "数字使用逗号隔开，如-1,0,1,2    -1是用来占位的，具体哪个数字对应哪个物品请到雷电商城的mod介绍页查看");
-
+            offset = Config.Bind<float>("InstantBuy Config", "offset 偏移", 0.2f, "Controls the offset of where purchased items are generated 控制购买物品生成位置的偏移");
+            ignored_item = Config.Bind<string>("InstantBuy Config", "ignored_item 不会触发该mod的物品名单", "-1,", "Numbers are separated by commas, e.g. -1,0,1,2    -1 is used as a placeholder, please go to the mod introduction page in the ThunderStore to check which number corresponds to which item. " + "数字使用逗号隔开，如-1,0,1,2    -1是用来占位的，具体哪个数字对应哪个物品请到雷电商城的mod介绍页查看");
+            companyOnly = Config.Bind<bool>("InstantBuy Config", "Company Only", true, "Restricts this mod to only Company Moons (Gordion & Galetry)");
             Logger = base.Logger;
             harmony.PatchAll();
             Logger.LogInfo("InstantBuy " + modVersion + " loaded.");
-
-            
         }
-
         /// <summary>
         /// 瞬间生成购买物品 （客机仍然会保留买物品的数量）
         /// </summary>
@@ -71,17 +60,24 @@ namespace InstantBuy
         internal class Terminal_Patch
         {
             private static List<int> instantItems;
-
-
             [HarmonyPatch("SyncGroupCreditsClientRpc")]
             [HarmonyPrefix]
             public static void Prefix(Terminal __instance, int newGroupCredits, ref int numItemsInShip)
             {
-                if (StartOfRound.Instance.localPlayerController==null) return;
+                if (StartOfRound.Instance.localPlayerController == null) return;
                 NetworkManager networkManager = StartOfRound.Instance.localPlayerController.NetworkManager;
                 if (!networkManager.IsServer) return;
-
-
+                bool isCompanyMoon = false;
+                if (StartOfRound.Instance.currentLevel.PlanetName == "CompanyBuildingLevel" || StartOfRound.Instance.currentLevel.PlanetName == "GaletryLevel")
+                {
+                    isCompanyMoon = true;
+                    Logger.LogInfo("Company Moon + Config option detected");
+                }
+                else
+                {
+                    Logger.LogInfo("Skipping prevention of instant items since the current level is: " + StartOfRound.Instance.currentLevel.PlanetName);
+                }
+                if (Instance.companyOnly.Value && !isCompanyMoon) return; //If config says only Company, and its not the company, exit
                 List<int> boughtItems = __instance.orderedItemsFromTerminal;
                 List<int> ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
                 instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();
@@ -100,7 +96,17 @@ namespace InstantBuy
                 NetworkManager networkManager = StartOfRound.Instance.localPlayerController.NetworkManager;
                 if (!networkManager.IsServer) return;
 
-
+                bool isCompanyMoon = false;
+                if (StartOfRound.Instance.currentLevel.PlanetName == "Gordion" || StartOfRound.Instance.currentLevel.PlanetName == "Galetry")
+                {
+                    isCompanyMoon = true;
+                    Logger.LogInfo("Company Moon + Config option detected");
+                }
+                else
+                {
+                    Logger.LogInfo("Skipping prevention of instant items since the current level is: " + StartOfRound.Instance.currentLevel.PlanetName);
+                }
+                if (Instance.companyOnly.Value && !isCompanyMoon) return; //If config says only Company, and its not the company, exit
                 List<int> boughtItems = __instance.orderedItemsFromTerminal;
                 List<int> ignoredItem_list = InstantBuy.Instance.ignored_item.Value.Trim(',').Split(',').Select(int.Parse).ToList();
                 instantItems = boughtItems.Where(item => !ignoredItem_list.Contains(item)).ToList();

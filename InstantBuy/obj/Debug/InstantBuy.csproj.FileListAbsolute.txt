@@ -32,6 +32,6 @@ C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\bin\Debug\UnityEngine.UIElement
 C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\bin\Debug\UnityEngine.UIModule.dll
 C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\obj\Debug\InstantBuy.csproj.AssemblyReference.cache
 C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\obj\Debug\InstantBuy.csproj.CoreCompileInputs.cache
-C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\obj\Debug\InstantBuy.csproj.CopyComplete
 C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\obj\Debug\InstantBuy.dll
 C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\obj\Debug\InstantBuy.pdb
+C:\Users\Zeta\source\repos\InstantBuy\InstantBuy\obj\Debug\InstantBuy.csproj.Up2Date

@@ -27,7 +27,7 @@ namespace InstantBuy
     {
         private const string modGUID = "nexor.InstantBuy";
         private const string modName = "InstantBuy";
-        private const string modVersion = "0.0.8";
+        private const string modVersion = "0.0.9";
 
         private readonly Harmony harmony = new Harmony(modGUID);
 
@@ -68,7 +68,7 @@ namespace InstantBuy
                 NetworkManager networkManager = StartOfRound.Instance.localPlayerController.NetworkManager;
                 if (!networkManager.IsServer) return;
                 bool isCompanyMoon = false;
-                if (StartOfRound.Instance.currentLevel.PlanetName == "CompanyBuildingLevel" || StartOfRound.Instance.currentLevel.PlanetName == "GaletryLevel")
+                if (StartOfRound.Instance.currentLevel.PlanetName == "Gordion" || StartOfRound.Instance.currentLevel.PlanetName == "Galetry")
                 {
                     isCompanyMoon = true;
                     Logger.LogInfo("Company Moon + Config option detected");
